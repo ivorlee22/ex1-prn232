@@ -48,28 +48,58 @@ export default function ProfileCards() {
 
     try {
       const startTime = performance.now();
-      // Send REAL live HTTP request to Next.js route handler
-      const res = await fetch(`/api/live-test?protocol=${profile.id}`, {
-        cache: "no-store"
-      });
-      const data = await res.json();
-      const roundTripLatency = Math.round(performance.now() - startTime);
+      let status = 200;
+      let statusText = "OK";
+      let contentType = "application/json";
+      let payloadStr = "";
+      let latency = 0;
+
+      if (profile.id === "rest") {
+        // Direct client fetch to JSONPlaceholder (100% CORS enabled)
+        const res = await fetch("https://jsonplaceholder.typicode.com/posts/1", { cache: "no-store" });
+        status = res.status;
+        statusText = res.statusText || "OK";
+        contentType = res.headers.get("content-type") || "application/json";
+        const data = await res.json();
+        latency = Math.round(performance.now() - startTime);
+        payloadStr = JSON.stringify(data, null, 2);
+      } else if (profile.id === "graphql") {
+        // Direct client fetch to Countries GraphQL API (100% CORS enabled)
+        const res = await fetch("https://countries.trevorblades.com/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: "query GetVietnam { country(code: \"VN\") { name capital currency phone } }"
+          }),
+          cache: "no-store"
+        });
+        status = res.status;
+        statusText = res.statusText || "OK";
+        contentType = res.headers.get("content-type") || "application/json";
+        const data = await res.json();
+        latency = Math.round(performance.now() - startTime);
+        payloadStr = JSON.stringify(data, null, 2);
+      } else {
+        // SOAP, OData, gRPC: Route via /api/live-test to avoid cross-origin CORS blocks
+        const res = await fetch(`/api/live-test?protocol=${profile.id}`, { cache: "no-store" });
+        const data = await res.json();
+        latency = data.latency || Math.round(performance.now() - startTime);
+        status = data.status || res.status;
+        statusText = data.statusText || "OK";
+        contentType = data.contentType || "application/json";
+        payloadStr = typeof data.payload === "string" ? data.payload : JSON.stringify(data.payload, null, 2);
+      }
 
       soundFx.sparkle();
       setTestingId(null);
 
-      const payloadStr =
-        typeof data.payload === "string"
-          ? data.payload
-          : JSON.stringify(data.payload, null, 2);
-
       setTestResult((prev) => ({
         ...prev,
         [profile.id]: {
-          latency: data.latency || roundTripLatency,
-          status: data.status || res.status,
-          statusText: data.statusText || res.statusText || "OK",
-          contentType: data.contentType || res.headers.get("content-type") || "application/json",
+          latency,
+          status,
+          statusText,
+          contentType,
           payload: payloadStr,
           isLive: true
         }

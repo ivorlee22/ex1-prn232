@@ -9,7 +9,6 @@ import ArchitectureFlow from "@/components/ArchitectureFlow";
 import ArchitectureArena from "@/components/ArchitectureArena";
 import VideoAudioTheater from "@/components/VideoAudioTheater";
 import ReferencesSection from "@/components/ReferencesSection";
-import ChipBotMascot from "@/components/ChipBotMascot";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -18,13 +17,13 @@ export default function Home() {
       {/* Top Sticky Navigation Bar */}
       <Navbar />
 
-      {/* Hero Section with Mascot & Assignment Map */}
+      {/* Hero Section */}
       <Hero />
 
       {/* Requirement 1: 14 Comparative Criteria Matrix */}
       <ComparisonMatrix />
 
-      {/* Deep Dive 5 Profiles & Live Request Simulator */}
+      {/* Deep Dive 5 Profiles & Live Network Request */}
       <ProfileCards />
 
       {/* Requirement 2: Case Study & Interactive Weighted Decision Calculator */}
@@ -44,9 +43,6 @@ export default function Home() {
 
       {/* Requirement 5: 16 Official & Academic References */}
       <ReferencesSection />
-
-      {/* Interactive Mascot Chip Bot */}
-      <ChipBotMascot />
 
       {/* Footer */}
       <Footer />

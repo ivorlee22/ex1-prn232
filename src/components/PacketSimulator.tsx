@@ -126,11 +126,34 @@ export default function PacketSimulator() {
 
   const activeReq = requestDetails[selectedMethod];
 
-  const handleStartSimulation = () => {
+  const handleStartSimulation = async () => {
     if (isSimulating) return;
     setIsSimulating(true);
     setCurrentStep(1);
     soundFx.whoosh();
+
+    // Trigger REAL network request in browser DevTools
+    try {
+      if (selectedMethod === "GET") {
+        fetch("/api/sms-students?studentId=SE160001", { cache: "no-store" }).catch(() => {});
+      } else if (selectedMethod === "POST") {
+        fetch("/api/sms-students", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fullName: "Trần Thị Mai", major: "Information Assurance" })
+        }).catch(() => {});
+      } else if (selectedMethod === "PUT") {
+        fetch("/api/sms-students", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fullName: "Nguyễn Văn An", phone: "+84 912 345 678" })
+        }).catch(() => {});
+      } else if (selectedMethod === "DELETE") {
+        fetch("/api/sms-students", { method: "DELETE" }).catch(() => {});
+      }
+    } catch {
+      // Ignore network failure
+    }
 
     const stepIntervals = [700, 1400, 2100, 2800, 3500];
 

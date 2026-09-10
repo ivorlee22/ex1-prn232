@@ -11,18 +11,28 @@ import {
   Copy,
   Clock,
   Terminal,
-  ShieldAlert,
   ShieldCheck,
   CheckCircle2,
   XCircle,
-  Play
+  Play,
+  Wifi,
+  Radio
 } from "lucide-react";
+
+interface LiveTestResult {
+  latency: number;
+  status: number;
+  statusText: string;
+  contentType?: string;
+  payload: string;
+  isLive: boolean;
+}
 
 export default function ProfileCards() {
   const profiles = Object.values(PROTOCOL_PROFILES);
   const [activeTab, setActiveTab] = useState<string>("rest");
   const [testingId, setTestingId] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<Record<string, { latency: number; payload: string }> | null>({});
+  const [testResult, setTestResult] = useState<Record<string, LiveTestResult>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const activeProfile = PROTOCOL_PROFILES[activeTab] || PROTOCOL_PROFILES.rest;
@@ -32,26 +42,52 @@ export default function ProfileCards() {
     setActiveTab(id);
   };
 
-  const handleSimulateRequest = (profile: ProtocolProfile) => {
+  const handleRealLiveRequest = async (profile: ProtocolProfile) => {
     soundFx.pop(750);
     setTestingId(profile.id);
 
-    setTimeout(() => {
+    try {
+      const startTime = performance.now();
+      // Send REAL live HTTP request to Next.js route handler
+      const res = await fetch(`/api/live-test?protocol=${profile.id}`, {
+        cache: "no-store"
+      });
+      const data = await res.json();
+      const roundTripLatency = Math.round(performance.now() - startTime);
+
       soundFx.sparkle();
       setTestingId(null);
-      const resStr =
-        typeof profile.responsePayload === "string"
-          ? profile.responsePayload
-          : JSON.stringify(profile.responsePayload, null, 2);
+
+      const payloadStr =
+        typeof data.payload === "string"
+          ? data.payload
+          : JSON.stringify(data.payload, null, 2);
 
       setTestResult((prev) => ({
         ...prev,
         [profile.id]: {
-          latency: profile.latencySim,
-          payload: resStr
+          latency: data.latency || roundTripLatency,
+          status: data.status || res.status,
+          statusText: data.statusText || res.statusText || "OK",
+          contentType: data.contentType || res.headers.get("content-type") || "application/json",
+          payload: payloadStr,
+          isLive: true
         }
       }));
-    }, 450);
+    } catch (err) {
+      soundFx.boing();
+      setTestingId(null);
+      setTestResult((prev) => ({
+        ...prev,
+        [profile.id]: {
+          latency: 0,
+          status: 500,
+          statusText: "Network Error",
+          payload: `Lỗi kết nối: ${(err as Error).message}`,
+          isLive: true
+        }
+      }));
+    }
   };
 
   const handleCopyCode = (profile: ProtocolProfile) => {
@@ -71,10 +107,10 @@ export default function ProfileCards() {
             <span>HỒ SƠ ĐỘC QUYỀN 5 KIẾN TRÚC API</span>
           </div>
           <h2 className="section-title">
-            DEEP DIVE <span className="gradient-text-graphql">BẢN CHẤT & LIVE SIMULATOR</span>
+            DEEP DIVE <span className="gradient-text-graphql">BẢN CHẤT & LIVE NETWORK REQUEST</span>
           </h2>
           <p className="section-desc">
-            Khám phá chi tiết kiến trúc, bản chất giao thức, mã nguồn mẫu và kiểm thử tương tác trực tiếp với các endpoint công cộng.
+            Kiểm thử tương tác trực tiếp với các endpoint công cộng trên Internet. Mỗi lần bấm nút là một request mạng thật 100% (bạn có thể mở F12 DevTools để xem).
           </p>
         </div>
 
@@ -153,6 +189,23 @@ export default function ProfileCards() {
                   }}
                 >
                   {activeProfile.badge}
+                </span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "4px 10px",
+                    borderRadius: "999px",
+                    background: "rgba(16, 185, 129, 0.15)",
+                    border: "1px solid #10B981",
+                    color: "#34D399",
+                    fontSize: "0.75rem",
+                    fontWeight: 800
+                  }}
+                >
+                  <Wifi size={13} />
+                  <span>LIVE ENDPOINT THẬT</span>
                 </span>
               </div>
               <p style={{ color: "#CBD5E1", fontSize: "1.05rem" }}>
@@ -327,7 +380,10 @@ export default function ProfileCards() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: "0.75rem", color: "#94A3B8", fontWeight: 700 }}>ENDPOINT THỰC NGHIỆM:</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "0.75rem", color: "#94A3B8", fontWeight: 700 }}>ENDPOINT INTERNET CÔNG CỘNG:</span>
+                    <span style={{ fontSize: "0.72rem", color: "#34D399", fontWeight: 700 }}>● ĐANG HOẠT ĐỘNG (ONLINE)</span>
+                  </div>
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", color: activeProfile.color, wordBreak: "break-all" }}>
                     {activeProfile.endpoint}
                   </div>
@@ -335,7 +391,7 @@ export default function ProfileCards() {
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                   <button
-                    onClick={() => handleSimulateRequest(activeProfile)}
+                    onClick={() => handleRealLiveRequest(activeProfile)}
                     disabled={testingId === activeProfile.id}
                     className="btn-comic btn-primary-comic"
                     style={{
@@ -347,16 +403,20 @@ export default function ProfileCards() {
                     }}
                   >
                     <Send size={16} />
-                    <span>{testingId === activeProfile.id ? "Đang Gửi Request..." : "Gửi Request Thử Nghiệm"}</span>
+                    <span>{testingId === activeProfile.id ? "Đang Gửi Qua Mạng..." : "Gửi Request Thật Qua Mạng 🚀"}</span>
                   </button>
 
                   <div style={{ fontSize: "0.78rem", color: "#94A3B8" }}>
                     Kỳ vọng: <strong>{activeProfile.result}</strong>
                   </div>
                 </div>
+
+                <div style={{ fontSize: "0.74rem", color: "#64748B", fontStyle: "italic", borderTop: "1px dashed rgba(255,255,255,0.08)", paddingTop: "8px" }}>
+                  💡 <strong>Gợi ý:</strong> Mở <strong>F12 DevTools ➔ tab Network</strong> trên trình duyệt để thấy request thật <code>/api/live-test?protocol={activeProfile.id}</code> được gửi và ghi nhận trực tiếp!
+                </div>
               </div>
 
-              {/* Simulator Response Inspector */}
+              {/* Real Live Simulator Response Inspector */}
               {testResult && testResult[activeProfile.id] && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -368,15 +428,19 @@ export default function ProfileCards() {
                     border: "1.5px solid #10B981"
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#34D399", fontWeight: 800, fontSize: "0.85rem" }}>
                       <CheckCircle2 size={16} />
-                      <span>PHẢN HỒI THÀNH CÔNG: HTTP 200 OK</span>
+                      <span>PHẢN HỒI THẬT: HTTP {testResult[activeProfile.id].status} {testResult[activeProfile.id].statusText}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.78rem", color: "#A7F3D0" }}>
                       <Clock size={14} />
-                      <span>Độ trễ: {testResult[activeProfile.id].latency} ms</span>
+                      <span>Độ trễ đo thực tế: <strong>{testResult[activeProfile.id].latency} ms</strong></span>
                     </div>
+                  </div>
+
+                  <div style={{ fontSize: "0.72rem", color: "#94A3B8", marginBottom: "8px" }}>
+                    Content-Type: <code>{testResult[activeProfile.id].contentType || "application/json"}</code>
                   </div>
 
                   <pre
@@ -386,7 +450,7 @@ export default function ProfileCards() {
                       borderRadius: "10px",
                       fontSize: "0.78rem",
                       color: "#E2E8F0",
-                      maxHeight: "160px",
+                      maxHeight: "180px",
                       overflowY: "auto",
                       margin: 0
                     }}
